@@ -217,6 +217,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/image-center',
+    name: 'ImageCenter',
+    component: () => import('@/views/user/ImageCenterView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Image Center',
+      titleKey: 'imageCenter.title',
+      descriptionKey: 'imageCenter.description'
+    }
+  },
+  {
     path: '/redeem',
     name: 'Redeem',
     component: () => import('@/views/user/RedeemView.vue'),

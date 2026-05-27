@@ -583,6 +583,37 @@ export interface ApiKey {
   reset_7d_at: string | null
 }
 
+export type ImageTaskMode = 'generation' | 'edit'
+export type ImageTaskStatus = 'pending' | 'running' | 'succeeded' | 'failed'
+
+export interface ImageTaskUpload {
+  field_name: string
+  file_name: string
+  content_type: string
+  data_base64: string
+}
+
+export interface ImageTask {
+  id: number
+  user_id: number
+  mode: ImageTaskMode
+  status: ImageTaskStatus
+  model: string
+  prompt: string
+  size: string
+  n: number
+  quality: string
+  request_json?: string
+  response_json?: string
+  error_message?: string
+  input_images_json?: string
+  input_mask_json?: string
+  started_at?: string | null
+  finished_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface CreateApiKeyRequest {
   name: string
   group_id?: number | null

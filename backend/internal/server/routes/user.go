@@ -91,6 +91,15 @@ func RegisterUserRoutes(
 			usage.POST("/dashboard/api-keys-usage", h.Usage.DashboardAPIKeysUsage)
 		}
 
+		// 生图任务中心
+		imageTasks := authenticated.Group("/image-tasks")
+		{
+			imageTasks.POST("/generations", h.ImageTask.CreateGeneration)
+			imageTasks.POST("/edits", h.ImageTask.CreateEdit)
+			imageTasks.GET("", h.ImageTask.List)
+			imageTasks.GET("/:id", h.ImageTask.Get)
+		}
+
 		// 公告（用户可见）
 		announcements := authenticated.Group("/announcements")
 		{
