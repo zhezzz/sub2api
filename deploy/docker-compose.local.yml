@@ -21,6 +21,48 @@
 
 services:
   # ===========================================================================
+  # Nginx Reverse Proxy
+  # ===========================================================================
+  nginx:
+    image: nginx:stable-alpine
+    container_name: sub2api-nginx
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    configs:
+      - source: nginx_default_conf
+        target: /etc/nginx/conf.d/default.conf
+    secrets:
+      - source: cloudflare_origin_cert
+        target: cloudflare-origin.crt
+      - source: cloudflare_origin_key
+        target: cloudflare-origin.key
+    depends_on:
+      sub2api:
+        condition: service_healthy
+      chatgpt2api:
+        condition: service_started
+    networks:
+      - sub2api-network
+
+  # ===========================================================================
+  # ChatGPT2API Application
+  # ===========================================================================
+  chatgpt2api:
+    image: ghcr.io/basketikun/chatgpt2api:latest
+    container_name: chatgpt2api
+    restart: unless-stopped
+    volumes:
+      - ./chatgpt2api_data/data:/app/data
+    #      - ./chatgpt2api_data/config.json:/app/config.json
+    environment:
+      - STORAGE_BACKEND=postgres
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sub2api}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/chatgpt2api
+      - CHATGPT2API_AUTH_KEY=${CHATGPT2API_AUTH_KEY:?CHATGPT2API_AUTH_KEY is required}
+    networks:
+      - sub2api-network
+
+  # ===========================================================================
   # Sub2API Application
   # ===========================================================================
   sub2api:
@@ -31,8 +73,8 @@ services:
       nofile:
         soft: 100000
         hard: 100000
-    ports:
-      - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8080}:8080"
+    # ports:
+    #   - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8080}:8080"
     volumes:
       # Local directory mapping for easy migration
       - ./data:/app/data
@@ -173,7 +215,7 @@ services:
     networks:
       - sub2api-network
     healthcheck:
-      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health"]
+      test: [ "CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -193,6 +235,10 @@ services:
     volumes:
       # Local directory mapping for easy migration
       - ./postgres_data:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-100}
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-sub2api}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -202,7 +248,7 @@ services:
     networks:
       - sub2api-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sub2api} -d ${POSTGRES_DB:-sub2api}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sub2api} -d ${POSTGRES_DB:-sub2api}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -225,12 +271,12 @@ services:
       # Local directory mapping for easy migration
       - ./redis_data:/data
     command: >
-        sh -c '
-          redis-server
-          --save 60 1
-          --appendonly yes
-          --appendfsync everysec
-          ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}'
+      sh -c '
+        redis-server
+        --save 60 1
+        --appendonly yes
+        --appendfsync everysec
+        ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}'
     environment:
       - TZ=${TZ:-Asia/Shanghai}
       # REDISCLI_AUTH is used by redis-cli for authentication (safer than -a flag)
@@ -238,7 +284,7 @@ services:
     networks:
       - sub2api-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -250,3 +296,73 @@ services:
 networks:
   sub2api-network:
     driver: bridge
+
+configs:
+  nginx_default_conf:
+    content: |
+      underscores_in_headers on;
+      
+      map $$http_upgrade $$connection_upgrade {
+          default upgrade;
+          '' '';
+      }
+      
+      server {
+          listen 443 ssl default_server;
+          http2 on;
+          server_name ~^ai\..+$;
+      
+          ssl_certificate /run/secrets/cloudflare-origin.crt;
+          ssl_certificate_key /run/secrets/cloudflare-origin.key;
+          client_max_body_size 256m;
+
+          location / {
+              proxy_pass http://sub2api:8080;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header X-Forwarded-Host $$host;
+              proxy_set_header CF-Connecting-IP $$http_cf_connecting_ip;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection $$connection_upgrade;
+              proxy_buffering off;
+              proxy_request_buffering off;
+              proxy_read_timeout 3600s;
+              proxy_send_timeout 3600s;
+          }
+      }
+
+      server {
+          listen 443 ssl;
+          http2 on;
+          server_name ~^c2a\..+$;
+
+          ssl_certificate /run/secrets/cloudflare-origin.crt;
+          ssl_certificate_key /run/secrets/cloudflare-origin.key;
+          client_max_body_size 256m;
+
+          location / {
+              proxy_pass http://chatgpt2api:80;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header X-Forwarded-Host $$host;
+              proxy_set_header CF-Connecting-IP $$http_cf_connecting_ip;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection $$connection_upgrade;
+              proxy_buffering off;
+              proxy_request_buffering off;
+              proxy_read_timeout 3600s;
+              proxy_send_timeout 3600s;
+          }
+      }
+
+secrets:
+  cloudflare_origin_cert:
+    file: ./cert.crt
+  cloudflare_origin_key:
+    file: ./private.key
