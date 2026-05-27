@@ -5,8 +5,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PLATFORM="${PLATFORM:-}"
 
-docker build --platform linux/amd64 -t weishaw/sub2api:latest \
+BUILD_CMD=(docker build)
+if [ -n "${PLATFORM}" ]; then
+    BUILD_CMD+=(--platform "${PLATFORM}")
+fi
+
+"${BUILD_CMD[@]}" -t weishaw/sub2api:latest \
     --build-arg GOPROXY=https://goproxy.cn,direct \
     --build-arg GOSUMDB=sum.golang.google.cn \
     -f "${REPO_ROOT}/Dockerfile" \
