@@ -317,9 +317,12 @@ watch(tasks, (items) => {
 
 async function loadKeys() {
   try {
-    const res = await keysAPI.list(1, 100, { status: 'active' })
-    apiKeys.value = res.items
-    if (!form.apiKeyId && res.items.length) form.apiKeyId = res.items[0].id
+    const res = await keysAPI.list(1, 999, { status: 'active' })
+    const imageEnabledKeys = res.items.filter(canUseImageGeneration)
+    apiKeys.value = imageEnabledKeys
+    if (!imageEnabledKeys.some(key => key.id === form.apiKeyId)) {
+      form.apiKeyId = imageEnabledKeys[0]?.id || 0
+    }
   } catch (err: unknown) {
     appStore.showError(extractApiErrorMessage(err, t('common.error')))
   }
@@ -400,6 +403,10 @@ function clearMaskFile() {
 
 function apiKeyOptionLabel(key: ApiKey) {
   return `${key.name}（${key.group?.name || t('keys.noGroup')}）`
+}
+
+function canUseImageGeneration(key: ApiKey) {
+  return Boolean(key.group?.allow_image_generation)
 }
 
 function statusDotClass(status: ImageTaskStatus) {
