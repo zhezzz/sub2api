@@ -30,12 +30,7 @@
           <div class="space-y-4">
             <label class="block">
               <span class="input-label">{{ t('imageCenter.apiKey') }}</span>
-              <select v-model.number="form.apiKeyId" class="input mt-1.5">
-                <option :value="0">-</option>
-                <option v-for="key in apiKeys" :key="key.id" :value="key.id">
-                  {{ apiKeyOptionLabel(key) }}
-                </option>
-              </select>
+              <Select v-model="form.apiKeyId" :options="apiKeyOptions" class="mt-1.5" :searchable="apiKeyOptions.length > 5" />
             </label>
 
             <div class="grid gap-4 sm:grid-cols-[1fr_132px] xl:grid-cols-1">
@@ -45,11 +40,7 @@
               </label>
               <label class="block">
                 <span class="input-label">{{ t('imageCenter.size') }}</span>
-                <select v-model="form.size" class="input mt-1.5">
-                  <option v-for="option in sizeOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
+                <Select v-model="form.size" :options="sizeOptions" class="mt-1.5" />
               </label>
             </div>
 
@@ -65,11 +56,7 @@
               </label>
               <label class="block">
                 <span class="input-label">{{ t('imageCenter.quality') }}</span>
-                <select v-model="form.quality" class="input mt-1.5">
-                  <option v-for="option in qualityOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
+                <Select v-model="form.quality" :options="qualityOptions" class="mt-1.5" />
               </label>
             </div>
 
@@ -122,92 +109,94 @@
           </div>
         </form>
 
-        <section class="card image-task-list overflow-hidden">
-          <div class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 dark:border-dark-700 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('imageCenter.tasks') }}</h3>
-              <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
-                {{ statusCounts.pending + statusCounts.running + statusCounts.succeeded + statusCounts.failed }}
-              </p>
+        <div class="image-center-main">
+          <section class="card image-task-list overflow-hidden">
+            <div class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 dark:border-dark-700 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('imageCenter.tasks') }}</h3>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
+                  {{ statusCounts.pending + statusCounts.running + statusCounts.succeeded + statusCounts.failed }}
+                </p>
+              </div>
+              <button type="button" class="btn btn-secondary" :disabled="loadingTasks" @click="loadTasks()">
+                <Icon name="refresh" size="sm" :class="loadingTasks ? 'animate-spin' : ''" />
+              </button>
             </div>
-            <button type="button" class="btn btn-secondary" :disabled="loadingTasks" @click="loadTasks()">
-              <Icon name="refresh" size="sm" :class="loadingTasks ? 'animate-spin' : ''" />
-            </button>
-          </div>
 
-          <div class="flex flex-wrap gap-2 border-b border-gray-100 px-5 py-3 dark:border-dark-700">
-            <span class="badge badge-warning">{{ t('imageCenter.status.pending') }} {{ statusCounts.pending }}</span>
-            <span class="badge badge-primary">{{ t('imageCenter.status.running') }} {{ statusCounts.running }}</span>
-            <span class="badge badge-success">{{ t('imageCenter.status.succeeded') }} {{ statusCounts.succeeded }}</span>
-            <span class="badge badge-danger">{{ t('imageCenter.status.failed') }} {{ statusCounts.failed }}</span>
-          </div>
+            <div class="flex flex-wrap gap-2 border-b border-gray-100 px-5 py-3 dark:border-dark-700">
+              <span class="badge badge-warning">{{ t('imageCenter.status.pending') }} {{ statusCounts.pending }}</span>
+              <span class="badge badge-primary">{{ t('imageCenter.status.running') }} {{ statusCounts.running }}</span>
+              <span class="badge badge-success">{{ t('imageCenter.status.succeeded') }} {{ statusCounts.succeeded }}</span>
+              <span class="badge badge-danger">{{ t('imageCenter.status.failed') }} {{ statusCounts.failed }}</span>
+            </div>
 
-          <div v-if="loadingTasks && !tasks.length" class="flex min-h-56 flex-1 items-center justify-center">
-            <div class="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"></div>
-          </div>
+            <div v-if="loadingTasks && !tasks.length" class="flex min-h-56 flex-1 items-center justify-center">
+              <div class="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"></div>
+            </div>
 
-          <div v-else-if="!tasks.length" class="flex min-h-56 flex-1 items-center justify-center px-5 py-12 text-sm text-gray-500 dark:text-gray-400">
-            {{ t('imageCenter.empty') }}
-          </div>
+            <div v-else-if="!tasks.length" class="flex min-h-56 flex-1 items-center justify-center px-5 py-12 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('imageCenter.empty') }}
+            </div>
 
-          <div v-else class="task-scroll divide-y divide-gray-100 dark:divide-dark-700">
-            <button
-              v-for="task in tasks"
-              :key="task.id"
-              type="button"
-              class="flex w-full items-start gap-4 px-5 py-4 text-left transition hover:bg-gray-50 dark:hover:bg-dark-700/60"
-              :class="selectedTask?.id === task.id ? 'bg-gray-50 dark:bg-dark-700/60' : ''"
-              @click="selectTask(task)"
-            >
-              <span class="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full" :class="statusDotClass(task.status)" />
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-sm font-medium text-gray-900 dark:text-white">{{ task.prompt }}</span>
-                <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-                  #{{ task.id }} · {{ task.model }} · {{ t(`imageCenter.status.${task.status}`) }} · {{ formatTime(task.created_at) }}
+            <div v-else class="task-scroll divide-y divide-gray-100 dark:divide-dark-700">
+              <button
+                v-for="task in tasks"
+                :key="task.id"
+                type="button"
+                class="flex w-full items-start gap-4 px-5 py-4 text-left transition hover:bg-gray-50 dark:hover:bg-dark-700/60"
+                :class="selectedTask?.id === task.id ? 'bg-gray-50 dark:bg-dark-700/60' : ''"
+                @click="selectTask(task)"
+              >
+                <span class="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full" :class="statusDotClass(task.status)" />
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium text-gray-900 dark:text-white">{{ task.prompt }}</span>
+                  <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                    #{{ task.id }} · {{ task.model }} · {{ t(`imageCenter.status.${task.status}`) }} · {{ formatTime(task.created_at) }}
+                  </span>
+                  <span v-if="task.error_message" class="mt-1 block truncate text-xs text-red-600 dark:text-red-400">{{ task.error_message }}</span>
                 </span>
-                <span v-if="task.error_message" class="mt-1 block truncate text-xs text-red-600 dark:text-red-400">{{ task.error_message }}</span>
-              </span>
-            </button>
-          </div>
-        </section>
-      </div>
-
-      <section class="card result-panel">
-        <div class="mb-4 flex items-center justify-between gap-4">
-          <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('imageCenter.result') }}</h2>
-          <span v-if="selectedTask" class="text-sm text-gray-500 dark:text-gray-400">#{{ selectedTask.id }}</span>
-        </div>
-
-        <div v-if="!selectedTask" class="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-          {{ t('imageCenter.noResult') }}
-        </div>
-
-        <div v-else class="space-y-6">
-          <div v-if="resultImages.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <figure v-for="(image, index) in resultImages" :key="image.src + index" class="overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700">
-              <img :src="image.src" class="aspect-square w-full bg-gray-100 object-contain dark:bg-dark-900" />
-              <figcaption class="flex items-center justify-between gap-3 px-3 py-2">
-                <span class="truncate text-xs text-gray-500 dark:text-gray-400">{{ image.label }}</span>
-                <button type="button" class="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white" @click="downloadImage(image.src, image.label)">
-                  <Icon name="download" size="sm" />
-                </button>
-              </figcaption>
-            </figure>
-          </div>
-
-          <div v-else class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            {{ selectedTask.error_message || t('imageCenter.noResult') }}
-          </div>
-
-          <div v-if="inputImages.length || inputMask" class="space-y-3">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('imageCenter.inputs') }}</h3>
-            <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              <img v-for="image in inputImages" :key="image.src" :src="image.src" class="aspect-square rounded border border-gray-200 object-cover dark:border-dark-700" />
-              <img v-if="inputMask" :src="inputMask.src" class="aspect-square rounded border border-dashed border-gray-300 object-cover dark:border-dark-600" />
+              </button>
             </div>
-          </div>
+          </section>
+
+          <section class="card result-panel">
+            <div class="mb-4 flex items-center justify-between gap-4">
+              <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('imageCenter.result') }}</h2>
+              <span v-if="selectedTask" class="text-sm text-gray-500 dark:text-gray-400">#{{ selectedTask.id }}</span>
+            </div>
+
+            <div v-if="!selectedTask" class="flex flex-1 items-center justify-center py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+              {{ t('imageCenter.noResult') }}
+            </div>
+
+            <div v-else class="result-content">
+              <div v-if="resultImages.length" class="result-grid">
+                <figure v-for="(image, index) in resultImages" :key="image.src + index" class="result-figure">
+                  <img :src="image.src" class="result-image" />
+                  <figcaption class="flex items-center justify-between gap-3 px-3 py-2">
+                    <span class="truncate text-xs text-gray-500 dark:text-gray-400">{{ image.label }}</span>
+                    <button type="button" class="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white" @click="downloadImage(image.src, image.label)">
+                      <Icon name="download" size="sm" />
+                    </button>
+                  </figcaption>
+                </figure>
+              </div>
+
+              <div v-else class="flex flex-1 items-center justify-center py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                {{ selectedTask.error_message || t('imageCenter.noResult') }}
+              </div>
+
+              <div v-if="inputImages.length || inputMask" class="space-y-3">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('imageCenter.inputs') }}</h3>
+                <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                  <img v-for="image in inputImages" :key="image.src" :src="image.src" class="aspect-square rounded border border-gray-200 object-cover dark:border-dark-700" />
+                  <img v-if="inputMask" :src="inputMask.src" class="aspect-square rounded border border-dashed border-gray-300 object-cover dark:border-dark-600" />
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -217,6 +206,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
+import Select from '@/components/common/Select.vue'
 import imageTasksAPI from '@/api/imageTasks'
 import keysAPI from '@/api/keys'
 import type { ApiKey, ImageTask, ImageTaskStatus, ImageTaskUpload } from '@/types'
@@ -280,6 +270,13 @@ const statusCounts = computed(() => {
 })
 const resultImages = computed(() => extractResultImages(selectedTask.value))
 const selectedApiKey = computed(() => apiKeys.value.find(key => key.id === form.apiKeyId)?.key || '')
+const apiKeyOptions = computed(() => [
+  { value: 0, label: '-' },
+  ...apiKeys.value.map(key => ({
+    value: key.id,
+    label: apiKeyOptionLabel(key),
+  })),
+])
 const inputImages = computed(() => extractUploads(selectedTask.value?.input_images_json))
 const inputMask = computed(() => {
   const raw = selectedTask.value?.input_mask_json
@@ -458,11 +455,15 @@ function downloadImage(src: string, label: string) {
 
 <style scoped>
 .image-center-page {
-  @apply mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8;
+  @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8;
 }
 
 .image-center-shell {
   @apply grid gap-6 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] xl:items-start;
+}
+
+.image-center-main {
+  @apply grid gap-6 xl:h-[calc(100vh-64px-3rem)] xl:grid-rows-[minmax(260px,0.9fr)_minmax(360px,1.4fr)];
 }
 
 .image-form {
@@ -470,7 +471,7 @@ function downloadImage(src: string, label: string) {
 }
 
 .image-task-list {
-  @apply flex min-h-[420px] flex-col xl:h-[calc(100vh-64px-4rem)];
+  @apply flex min-h-[360px] flex-col xl:min-h-0;
 }
 
 .task-scroll {
@@ -478,6 +479,22 @@ function downloadImage(src: string, label: string) {
 }
 
 .result-panel {
-  @apply p-5;
+  @apply flex min-h-[420px] flex-col overflow-y-auto p-5 xl:min-h-0;
+}
+
+.result-content {
+  @apply flex flex-1 flex-col gap-6;
+}
+
+.result-grid {
+  @apply flex flex-col gap-4;
+}
+
+.result-figure {
+  @apply flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-dark-700 dark:bg-dark-900;
+}
+
+.result-image {
+  @apply h-auto w-full object-contain;
 }
 </style>
