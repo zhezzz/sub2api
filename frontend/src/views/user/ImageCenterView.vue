@@ -45,7 +45,11 @@
               </label>
               <label class="block">
                 <span class="input-label">{{ t('imageCenter.size') }}</span>
-                <input v-model.trim="form.size" class="input mt-1.5" autocomplete="off" />
+                <select v-model="form.size" class="input mt-1.5">
+                  <option v-for="option in sizeOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
               </label>
             </div>
 
@@ -61,7 +65,11 @@
               </label>
               <label class="block">
                 <span class="input-label">{{ t('imageCenter.quality') }}</span>
-                <input v-model.trim="form.quality" class="input mt-1.5" autocomplete="off" />
+                <select v-model="form.quality" class="input mt-1.5">
+                  <option v-for="option in qualityOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
               </label>
             </div>
 
@@ -221,12 +229,30 @@ const appStore = useAppStore()
 const activeTabClass = 'bg-white text-gray-900 shadow-sm dark:bg-dark-900 dark:text-white'
 const inactiveTabClass = 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
 
+const sizeOptions = [
+  { value: 'auto', label: 'auto' },
+  { value: '1024x1024', label: '1024x1024' },
+  { value: '1024x1536', label: '1024x1536' },
+  { value: '1536x1024', label: '1536x1024' },
+  { value: '2048x2048', label: '2048x2048' },
+  { value: '2048x1152', label: '2048x1152' },
+  { value: '1152x2048', label: '1152x2048' },
+  { value: '3840x2160', label: '3840x2160' },
+  { value: '2160x3840', label: '2160x3840' },
+]
+const qualityOptions = [
+  { value: 'auto', label: 'auto' },
+  { value: 'low', label: 'low' },
+  { value: 'medium', label: 'medium' },
+  { value: 'high', label: 'high' },
+]
+
 const mode = ref<'generation' | 'edit'>('generation')
 const form = reactive({
   apiKeyId: 0,
   model: 'gpt-image-2',
   prompt: '',
-  size: '1024x1024',
+  size: 'auto',
   n: 1,
   quality: 'auto',
 })
