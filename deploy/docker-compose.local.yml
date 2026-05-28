@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./chatgpt2api_data/data:/app/data
-    #      - ./chatgpt2api_data/config.json:/app/config.json
+      - ./chatgpt2api_data/config.json:/app/config.json
     environment:
       - STORAGE_BACKEND=postgres
       - DATABASE_URL=postgresql://${POSTGRES_USER:-sub2api}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/chatgpt2api
