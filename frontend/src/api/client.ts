@@ -66,6 +66,11 @@ apiClient.interceptors.request.use(
       config.headers['Accept-Language'] = getLocale()
     }
 
+    // Let the browser/axios set multipart boundaries for file uploads.
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      config.headers.delete('Content-Type')
+    }
+
     // Attach timezone for all GET requests (backend may use it for default date ranges)
     if (config.method === 'get') {
       if (!config.params) {
