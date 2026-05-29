@@ -406,7 +406,7 @@ function apiKeyOptionLabel(key: ApiKey) {
 }
 
 function canUseImageGeneration(key: ApiKey) {
-  return Boolean(key.group?.allow_image_generation)
+  return key.group?.platform === 'openai' && Boolean(key.group.allow_image_generation)
 }
 
 function statusDotClass(status: ImageTaskStatus) {
