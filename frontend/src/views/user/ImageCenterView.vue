@@ -162,7 +162,13 @@
           <section class="card result-panel">
             <div class="mb-4 flex items-center justify-between gap-4">
               <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('imageCenter.result') }}</h2>
-              <span v-if="selectedTask" class="text-sm text-gray-500 dark:text-gray-400">#{{ selectedTask.id }}</span>
+              <div v-if="selectedTask" class="flex items-center gap-2">
+                <button v-if="resultImages.length > 1" type="button" class="btn btn-secondary" @click="downloadAllImages">
+                  <Icon name="download" size="sm" />
+                  {{ t('imageCenter.downloadAll') }}
+                </button>
+                <span class="text-sm text-gray-500 dark:text-gray-400">#{{ selectedTask.id }}</span>
+              </div>
             </div>
 
             <div v-if="!selectedTask" class="flex flex-1 items-center justify-center py-10 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -172,12 +178,21 @@
             <div v-else class="result-content">
               <div v-if="resultImages.length" class="result-grid">
                 <figure v-for="(image, index) in resultImages" :key="image.src + index" class="result-figure">
-                  <img :src="image.src" class="result-image" />
-                  <figcaption class="flex items-center justify-between gap-3 px-3 py-2">
-                    <span class="truncate text-xs text-gray-500 dark:text-gray-400">{{ image.label }}</span>
-                    <button type="button" class="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white" @click="downloadImage(image.src, image.label)">
-                      <Icon name="download" size="sm" />
+                  <div class="result-image-wrap">
+                    <img :src="image.src" class="result-image" />
+                    <button
+                      type="button"
+                      class="result-download-button"
+                      :aria-label="t('imageCenter.download')"
+                      :title="t('imageCenter.download')"
+                      @click="downloadImage(image.src, image.label)"
+                    >
+                      <Icon name="download" size="sm" :stroke-width="2" />
+                      <span>{{ t('imageCenter.download') }}</span>
                     </button>
+                  </div>
+                  <figcaption class="px-3 py-2">
+                    <span class="truncate text-xs text-gray-500 dark:text-gray-400">{{ image.label }}</span>
                   </figcaption>
                 </figure>
               </div>
@@ -422,13 +437,31 @@ function formatTime(raw: string) {
   return new Date(raw).toLocaleString()
 }
 
+function formatImageTimestamp(raw?: string) {
+  const date = raw ? new Date(raw) : new Date()
+  const validDate = Number.isNaN(date.getTime()) ? new Date() : date
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return [
+    validDate.getFullYear(),
+    pad(validDate.getMonth() + 1),
+    pad(validDate.getDate()),
+    '-',
+    pad(validDate.getHours()),
+    pad(validDate.getMinutes()),
+    pad(validDate.getSeconds()),
+  ].join('')
+}
+
 function extractResultImages(task: ImageTask | null): Array<{ src: string; label: string }> {
   if (!task?.response_json) return []
   try {
     const parsed = JSON.parse(task.response_json) as { data?: Array<{ b64_json?: string; url?: string }> }
-    return (parsed.data || []).flatMap((item, index) => {
-      if (item.b64_json) return [{ src: `data:image/png;base64,${item.b64_json}`, label: `image-${index + 1}.png` }]
-      if (item.url) return [{ src: item.url, label: `image-${index + 1}` }]
+    const items = parsed.data || []
+    const timestamp = formatImageTimestamp(task.created_at)
+    return items.flatMap((item, index) => {
+      const label = items.length > 1 ? `${timestamp}-${index + 1}.png` : `${timestamp}.png`
+      if (item.b64_json) return [{ src: `data:image/png;base64,${item.b64_json}`, label }]
+      if (item.url) return [{ src: item.url, label }]
       return []
     })
   } catch {
@@ -457,6 +490,12 @@ function downloadImage(src: string, label: string) {
   link.href = src
   link.download = label.endsWith('.png') ? label : `${label}.png`
   link.click()
+}
+
+function downloadAllImages() {
+  resultImages.value.forEach(image => {
+    downloadImage(image.src, image.label)
+  })
 }
 </script>
 
@@ -501,7 +540,15 @@ function downloadImage(src: string, label: string) {
   @apply flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-dark-700 dark:bg-dark-900;
 }
 
+.result-image-wrap {
+  @apply relative;
+}
+
 .result-image {
   @apply h-auto w-full object-contain;
+}
+
+.result-download-button {
+  @apply absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-md bg-primary-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-primary-900/20 transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2 focus:ring-offset-gray-100 active:scale-[0.98] dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-primary-400 dark:focus:ring-offset-dark-900;
 }
 </style>

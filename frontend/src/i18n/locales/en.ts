@@ -416,6 +416,7 @@ export default {
     result: 'Result',
     inputs: 'Inputs',
     download: 'Download',
+    downloadAll: 'Download All',
     empty: 'No tasks',
     noResult: 'No result yet',
     status: {

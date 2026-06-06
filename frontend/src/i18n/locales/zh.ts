@@ -416,6 +416,7 @@ export default {
     result: '结果',
     inputs: '输入',
     download: '下载',
+    downloadAll: '下载全部',
     empty: '暂无任务',
     noResult: '暂无结果',
     status: {
